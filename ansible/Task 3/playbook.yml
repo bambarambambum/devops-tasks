@@ -1,0 +1,49 @@
+---
+- name: Run simple site on nginx
+  hosts: all
+  become: true
+  tasks:
+  - name: Update, upgrade and install Nginx on Ubuntu
+    block: 
+      - name: Update apt and upgrade all packages
+        apt:
+          update_cache: yes
+          upgrade: yes
+
+      - name: Reboot the server with all defaults
+        reboot:
+
+      - name: Install nginx
+        apt:
+          name: nginx
+          state: latest
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Update, ugrade and install Nginx on RHEL/Amazon
+    block:
+      - name: Update yum and upgrade all packages
+        yum:
+          name: '*'
+          state: latest
+          update_cache: yes
+
+      - name: Reboot the server with all defaults
+        reboot:
+
+      - name: Install nginx
+        yum:
+          name: nginx
+          state: latest
+    when: ansible_facts['os_family'] == "RedHat"
+
+  - name: Start and enable nginx
+    service:
+      name: nginx
+      state: started
+      enabled: yes
+
+  - name: Copy site file
+    template:
+      src: ./site/index.html.j2
+      dest: /var/www/html/index.html
+      mode: 0744

@@ -19,11 +19,29 @@ resource "aws_key_pair" "default" {
 }
 
 # Instance
-resource "aws_instance" "app" {
+resource "aws_instance" "app1" {
 
   ami           = "ami-05f7491af5eef733a"
-  count = 2
   instance_type = var.instance_type
   associate_public_ip_address = true
   key_name = var.key_name
 }
+
+# Instance
+resource "aws_instance" "app2" {
+
+  ami           = "ami-030e490c34394591b"
+  instance_type = var.instance_type
+  associate_public_ip_address = true
+  key_name = var.key_name
+}
+
+# Instance
+resource "aws_instance" "app3" {
+
+  ami           = "ami-06ec8443c2a35b0ba"
+  instance_type = var.instance_type
+  associate_public_ip_address = true
+  key_name = var.key_name
+}
+
