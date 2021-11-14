@@ -1,0 +1,22 @@
+---
+- name: Run simple site on nginx
+  hosts: all
+  become: true
+  tasks:
+  - name: Update apt cache and install nginx
+    apt:
+      name: nginx
+      state: latest
+      update_cache: yes
+
+  - name: Start and enable nginx
+    service:
+      name: nginx
+      state: started
+      enabled: yes
+
+  - name: Copy site file
+    template:
+      src: ./site/index.html.j2
+      dest: /var/www/html/index.html
+      mode: 0744
