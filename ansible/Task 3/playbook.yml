@@ -17,9 +17,9 @@
         apt:
           name: nginx
           state: latest
-    when: ansible_facts['os_family'] == "Debian"
+    when: ansible_facts['distribution'] == "Ubuntu"
 
-  - name: Update, ugrade and install Nginx on RHEL/Amazon
+  - name: Update, ugrade and install Nginx on RHEL
     block:
       - name: Update yum and upgrade all packages
         yum:
@@ -34,7 +34,24 @@
         yum:
           name: nginx
           state: latest
-    when: ansible_facts['os_family'] == "RedHat"
+    when: ansible_facts['distribution'] == "RedHat"
+
+  - name: Update, ugrade and install Nginx on Amazon Linux
+    block:
+      - name: Update yum and upgrade all packages
+        yum:
+          name: '*'
+          state: latest
+          update_cache: yes
+
+      - name: Reboot the server with all defaults
+        reboot:
+
+      - name: Install nginx from amazon extras
+        command: amazon-linux-extras install nginx1 -y
+        args:
+          creates: /sbin/nginx
+    when: ansible_facts['distribution'] == "Amazon"
 
   - name: Start and enable nginx
     service:
@@ -42,8 +59,20 @@
       state: started
       enabled: yes
 
-  - name: Copy site file
-    template:
-      src: ./site/index.html.j2
-      dest: /var/www/html/index.html
-      mode: 0744
+  - name: Copy site file to RedHat
+    block:
+    - name: Copy site file
+      template:
+        src: ./site/index.html.j2
+        dest: /usr/share/nginx/html/index.html
+        mode: 0744
+    when: ansible_facts['distribution'] == "Amazon"
+
+  - name: Copy site file to another to OS
+    block:
+    - name: Copy site file
+      template:
+        src: ./site/index.html.j2
+        dest: /var/www/html/index.html
+        mode: 0744
+    when: ansible_facts['distribution'] != "Amazon"
