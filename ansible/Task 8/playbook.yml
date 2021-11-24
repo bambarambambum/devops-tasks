@@ -1,0 +1,139 @@
+---
+- name: Prepare Windows Server
+  hosts: prepare
+  vars_prompt:
+    - name: domain_username
+      prompt: Input your username to join server into domain
+      private: no
+
+    - name: domain_password
+      prompt: Input your password to joint server into domain
+
+    - name: local_admin_password
+      prompt: Input local admin password from Keepass
+
+  tasks:
+  - name: Install all updates and reboot as many times as needed
+    ansible.windows.win_updates:
+      category_names: '*'
+      reboot: yes
+      reboot_timeout: 1800
+
+  - name: Install .NET Framework 3.5 (include 2.0+)
+    ansible.windows.win_feature:
+      name:
+      - Net-Framework-Features
+      - Net-Framework-Core
+    when: install_netframework3 | bool
+
+  - name: Install .NET Framework 4.7
+    ansible.windows.win_feature:
+      name:
+      - Net-Framework-45-Features
+      - Net-Framework-45-Core
+    when: install_netframework4 | bool
+
+  - name: Change the hostname to specified hostname
+    ansible.windows.win_hostname:
+      name: "{{ hostname }}"
+    register: result
+
+  - name: Reboot after rename
+    ansible.windows.win_reboot:
+    when: result.reboot_required
+  
+  - name: Join to the domain
+    ansible.windows.win_domain_membership:
+      dns_domain_name: "{{ dns_domain_name }}"
+      hostname: "{{ hostname }}"
+      domain_admin_user: "{{ domain_username }}"
+      domain_admin_password: "{{ domain_password }}"
+      domain_ou_path: "OU=Servers,DC=simple,DC=ru"
+      state: domain
+    register: domain_state
+
+  - name: Reboot after join to domain
+    ansible.windows.win_reboot:
+    when: domain_state.reboot_required
+
+  - name: Disable firewall for Domain, Public and Private profiles
+    community.windows.win_firewall:
+      state: disabled
+      profiles:
+      - Domain
+      - Private
+      - Public
+
+  - name: Disable UAC
+    ansible.windows.win_powershell:
+      script: |
+        New-ItemProperty -Path HKLM:Software\Microsoft\Windows\CurrentVersion\policies\system -Name EnableLUA -PropertyType DWord -Value 0 -Force
+    when: disable_uac | bool
+
+  - name: Enable RDP
+    ansible.windows.win_powershell:
+      script: |
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" –Value 0
+
+  - name: Auth with domain creds
+    set_fact:
+      ansible_user: "{{ domain_username }}"
+      ansible_password: "{{ domain_password }}"
+      ansible_winrm_transport: ntlm
+
+  - name: Change local administrator password to password from Keepass
+    ansible.windows.win_user:
+      name: Administrator
+      password: "{{ local_admin_password }}"
+      state: present
+      password_never_expires: yes
+      groups:
+        - Administrators
+
+  - name: Install Zabbix Agent
+    block:
+      - name: Create Zabbix directory
+        ansible.windows.win_file:
+          path: C:\zabbix
+          state: directory
+      
+      - name: Copy a zabbix_agentd.exe file
+        ansible.windows.win_copy:
+          src: files/zabbix/zabbix_agentd.exe
+          dest: C:\zabbix\zabbix_agentd.exe
+
+      - name: Copy a zabbix_agentd.log file
+        ansible.windows.win_copy:
+          src: files/zabbix/zabbix_agentd.log
+          dest: C:\zabbix\zabbix_agentd.log
+
+      - name: Copy a server.conf config file
+        ansible.windows.win_copy:
+          src: files/zabbix/server.conf
+          dest: C:\zabbix\server.conf
+
+      - name: Install Zabbix Agent
+        win_shell: C:\zabbix\zabbix_agentd.exe -c C:\zabbix\server.conf -i
+        args:
+          executable: cmd
+
+      - name: Run Zabbix Agent
+        win_shell: C:\zabbix\zabbix_agentd.exe -c C:\zabbix\server.conf -s
+        args:
+          executable: cmd
+    when: install_zabbix | bool
+    ignore_errors: yes
+
+  - name: Install Kasperskiy Antivirus WSEE
+    block:
+      - name: Copy a installer.exe (400+ Mb, may take time)
+        ansible.windows.win_copy:
+          src: files/antivirus/installer.exe
+          dest: C:\installer.exe
+
+      - name: Install Kasperskiy Antivirus WSEE
+        win_shell: C:\installer.exe /s
+        args:
+          executable: cmd
+    when: install_kasperskiy | bool
+    ignore_errors: yes

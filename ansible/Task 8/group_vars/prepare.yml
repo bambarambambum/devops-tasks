@@ -1,0 +1,14 @@
+ansible_user: Administrator
+ansible_password: SuperPassword
+ansible_connection: winrm
+ansible_winrm_transport: basic
+ansible_winrm_server_cert_validation: ignore
+
+hostname: WINSERVER
+dns_domain_name: simple.ru
+install_kasperskiy: yes
+install_zabbix: yes
+install_netframework3: yes
+install_netframework4: yes
+disable_firewall: yes
+disable_uac: yes
